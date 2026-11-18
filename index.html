@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#ffffff">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Sunpath">
+<title>Sunpath</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="style.css?v=261118190439">
+</head>
+<body class="mode-map">
+<i id="safe"></i>
+<div id="stage">
+  <div id="map"></div>
+  <canvas id="fx"></canvas>
+
+  <!-- 로드뷰: 사진(카카오) · 3D(직접 그린 거리) -->
+  <div id="rv" hidden>
+    <div id="rvPhoto" hidden>
+      <div id="rvView"></div>
+    </div>
+    <div id="rv3d" hidden>
+      <canvas id="sc"></canvas>
+      <canvas id="scFx"></canvas>
+      <p id="scCredit">건물 · 길 © OpenStreetMap · 높이 기록이 없는 건물은 어림값</p>
+    </div>
+    <canvas id="rvMini" role="button" aria-label="나침반으로 보기" hidden></canvas>
+    <p id="rvSpot" hidden></p>
+    <div class="rv-tools">
+      <div class="sub" role="tablist">
+        <button data-sub="3d" role="tab">3D</button>
+        <button data-sub="photo" role="tab">사진</button>
+      </div>
+      <span class="gap"></span>
+      <button id="lens" class="chip">화각</button>
+      <button id="rvFollow" class="chip phone-only">폰 따라 보기</button>
+      <button id="scWalk" class="round" aria-label="앞으로 걷기"><svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+    </div>
+  </div>
+
+  <!-- 카메라 AR -->
+  <div id="ar" hidden>
+    <video id="arVideo" playsinline muted autoplay></video>
+    <canvas id="arFx"></canvas>
+    <div id="arStart" class="notice">
+      <p class="notice-title">카메라로 하늘을 비추면<br>오늘 해가 지나갈 길이 보여요</p>
+      <p class="notice-body">카메라 · 나침반 · 위치 권한을 씁니다.</p>
+      <button id="arGo" class="primary">카메라 켜기</button>
+    </div>
+    <div id="arHud" hidden>
+      <div class="ar-top">
+        <div id="arHeading"></div>
+        <button id="arCal" class="chip">해에 맞추기</button>
+      </div>
+      <button id="arShot" aria-label="사진 찍기"></button>
+    </div>
+  </div>
+
+  <!-- 나침반: 내 자리에서 본 하루 해 -->
+  <div id="cmp" hidden>
+    <canvas id="cmpCv"></canvas>
+    <div id="cmpHud">
+      <div>
+        <p id="cmpHead">—</p>
+        <p id="cmpSub">내 자리 기준</p>
+      </div>
+      <button id="cmpFollow" class="chip phone-only">폰 따라 돌리기</button>
+    </div>
+  </div>
+
+  <header id="top">
+    <form id="search" autocomplete="off">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path class="sun" d="M6.5 16.5a5.5 5.5 0 0 1 11 0Z"/><path d="M3 16.5h18M12 5.5v2.2M5.2 8.6l1.6 1.6M18.8 8.6l-1.6 1.6"/></svg>
+      <input id="q" type="search" placeholder="장소 · 주소 찾기" enterkeyhint="search">
+      <button type="button" id="fav" aria-label="이 자리 찜하기"><svg viewBox="0 0 24 24"><path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8L12 3.6Z"/></svg></button>
+    </form>
+    <button id="locate" class="icon" aria-label="내 위치"><svg viewBox="0 0 24 24"><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="1.6" class="fill"/></svg></button>
+    <button id="share" class="icon" aria-label="보내기 · 저장"><svg viewBox="0 0 24 24"><path d="M12 15V3M7.5 7.5 12 3l4.5 4.5"/><path d="M5 12v7.5h14V12"/></svg></button>
+    <ul id="results" hidden></ul>
+    <div id="menu" hidden>
+      <button id="mLink">이 자리 · 시각 링크 보내기</button>
+      <button id="mReport">답사 리포트 이미지 저장</button>
+      <button id="mFavs">찜 목록을 다른 기기로 보내기</button>
+    </div>
+  </header>
+  <button id="toPin" class="chip" hidden>고른 자리로</button>
+  <p id="toast" class="toast" hidden></p>
+</div>
+
+<section id="sheet">
+  <button id="grip" aria-label="시트 접기 · 펴기"><i></i></button>
+  <button id="panelBtn" aria-label="패널 접기"><span>접기</span><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></button>
+  <div class="brand">
+    <b>Sunpath</b><span>촬영지의 해와 그림자를 미리 걷는 답사</span>
+  </div>
+
+  <nav class="seg" role="tablist">
+    <button data-mode="map" class="on" role="tab"><svg viewBox="0 0 24 24"><path d="M9 4 3 6.5v13L9 17l6 2.5 6-2.5v-13L15 6.5 9 4Z"/><path d="M9 4v13M15 6.5v13"/></svg>지도</button>
+    <button data-mode="rv" role="tab"><svg viewBox="0 0 24 24"><path d="M9 4 4.5 20M15 4l4.5 16M12 5v2.5M12 10.5V13M12 16.5V19"/></svg>로드뷰</button>
+    <button data-mode="cmp" role="tab"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.6 8.4-2.1 5.1-5.1 2.1 2.1-5.1 5.1-2.1Z"/></svg>나침반</button>
+    <button data-mode="ar" role="tab"><svg viewBox="0 0 24 24"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><circle cx="12" cy="12" r="3"/></svg>AR</button>
+  </nav>
+
+  <div class="when">
+    <div class="clock">
+      <div id="tTime" class="time" aria-live="off">--:--</div>
+      <label class="date"><span id="tDate">-</span><input type="date" id="dateIn"></label>
+    </div>
+    <dl class="readout">
+      <div><dt id="sAzName">방위</dt><dd id="sAz">-</dd></div>
+      <div><dt>고도</dt><dd id="sAlt">-</dd></div>
+      <div><dt>그림자</dt><dd id="sLen">-</dd></div>
+    </dl>
+  </div>
+
+  <div class="say">
+    <div>
+      <p id="phase" class="phase"><i></i><b>—</b><span></span></p>
+      <p id="sayLine" class="line"></p>
+      <p id="spotLine" class="spot" hidden></p>
+      <p id="aimLine" class="spot aim" hidden></p>
+      <p id="wx" class="wx"></p>
+    </div>
+    <button id="nowBtn" class="now">지금</button>
+  </div>
+
+  <div id="ruler" class="ruler" role="slider" tabindex="0" aria-label="시간" aria-valuemin="0" aria-valuemax="1439">
+    <canvas id="rulerCv"></canvas>
+  </div>
+
+  <div class="moments" id="moments"></div>
+</section>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module" src="app.js?v=261118190439"></script>
+</body>
+</html>
